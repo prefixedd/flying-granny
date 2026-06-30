@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Flying Granny 👵</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    background: linear-gradient(135deg, #2c1810, #4a2c1a);
+    font-family: 'Comic Sans MS', 'Trebuchet MS', sans-serif;
+    overflow: hidden;
+    touch-action: manipulation;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  #gameContainer {
+    position: relative;
+    width: 480px;
+    max-width: 100vw;
+    height: 720px;
+    max-height: 100vh;
+    box-shadow: 0 0 40px rgba(0,0,0,0.6);
+    border-radius: 8px;
+    overflow: hidden;
+    background: #87CEEB;
+  }
+
+  canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    cursor: pointer;
+  }
+
+  #liveScore {
+    position: absolute;
+    top: 18px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 48px;
+    font-weight: 900;
+    color: #fff;
+    text-shadow: 3px 3px 0 #8B4513, -1px -1px 0 #8B4513, 1px -1px 0 #8B4513, -1px 1px 0 #8B4513;
+    z-index: 10;
+    pointer-events: none;
+    display: none;
+  }
+
+  #muteBtn {
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    z-index: 30;
+    background: rgba(0,0,0,0.35);
+    border: 2px solid #ffd966;
+    color: #fff;
+    font-size: 20px;
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    box-shadow: none;
+  }
+  #muteBtn:active { transform: none; box-shadow: none; }
+
+  .overlay {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: rgba(40, 20, 10, 0.85);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: #fff5e1;
+    text-align: center;
+    z-index: 20;
+    padding: 20px;
+  }
+
+  .hidden { display: none !important; }
+
+  .title {
+    font-size: 46px;
+    color: #ffd966;
+    text-shadow: 3px 3px 0 #8B4513;
+    margin-bottom: 6px;
+  }
+
+  .granny-icon {
+    font-size: 70px;
+    margin-bottom: 10px;
+    animation: bob 1.6s ease-in-out infinite;
+  }
+
+  @keyframes bob {
+    0%, 100% { transform: translateY(0) rotate(-5deg); }
+    50% { transform: translateY(-14px) rotate(5deg); }
+  }
+
+  .subtitle {
+    font-size: 16px;
+    color: #ffe9c7;
+    margin-bottom: 18px;
+  }
+
+  .score-box {
+    background: rgba(255,255,255,0.1);
+    border: 2px solid #ffd966;
+    border-radius: 12px;
+    padding: 10px 24px;
+    margin: 8px 0 18px 0;
+  }
+
+  .score-box .label { font-size: 13px; color: #ffd966; letter-spacing: 1px; }
+  .score-box .value { font-size: 32px; font-weight: bold; color: #fff; }
+
+  .final-score-row {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+
+  button {
+    font-family: inherit;
+    font-size: 20px;
+    font-weight: bold;
+    padding: 14px 32px;
+    background: linear-gradient(180deg, #ffd966, #e0a93b);
+    border: 3px solid #8B4513;
+    border-radius: 30px;
+    color: #4a2c10;
+    cursor: pointer;
+    box-shadow: 0 5px 0 #8B4513;
+    transition: transform 0.08s ease;
+  }
+
+  button:active {
+    transform: translateY(4px);
+    box-shadow: 0 1px 0 #8B4513;
+  }
+
+  .hint {
+    margin-top: 16px;
+    font-size: 13px;
+    color: #cdb18a;
+  }
+
+  .new-high {
+    color: #ff6b6b;
+    font-weight: bold;
+    font-size: 14px;
+    margin-top: -8px;
+    margin-bottom: 14px;
+    display: none;
+  }
+</style>
+</head>
+<body>
+
+<div id="gameContainer">
+  <canvas id="gameCanvas"></canvas>
+  <div id="liveScore">0</div>
+  <button id="muteBtn" title="Mute/Unmute music">🔊</button>
+
+  <!-- Start Screen -->
+  <div id="startScreen" class="overlay">
+    <div class="granny-icon">👵</div>
+    <div class="title">Flying Granny</div>
+    <div class="subtitle">She's got places to be — yarn or no yarn!</div>
+    <div class="score-box">
+      <div class="label">HIGH SCORE</div>
+      <div class="value" id="startHighScore">0</div>
+    </div>
+    <button id="startBtn">🚀 Press Space or Click to Start</button>
+    <div class="hint">Tap / Click / Space to flap upward</div>
+  </div>
+
+  <!-- Game Over Screen -->
+  <div id="gameOverScreen" class="overlay hidden">
+    <div class="title" style="font-size:36px;">Granny Took a Tumble! 🦴</div>
+    <div class="final-score-row">
+      <div class="score-box">
+        <div class="label">SCORE</div>
+        <div class="value" id="finalScore">0</div>
+      </div>
+      <div class="score-box">
+        <div class="label">HIGH SCORE</div>
+        <div class="value" id="finalHighScore">0</div>
+      </div>
+    </div>
+    <div class="new-high" id="newHighLabel">🎉 NEW HIGH SCORE! 🎉</div>
+    <button id="restartBtn">🔄 Play Again</button>
+  </div>
+</div>
+
+<script>
+(function () {
+  // ---------- Setup ----------
+  const canvas = document.getElementById('gameCanvas');
+  const ctx = canvas.getContext('2d');
+  const container = document.getElementById('gameContainer');
+
+  const W = 480, H = 720;
+  canvas.width = W;
+  canvas.height = H;
+
+  const liveScoreEl = document.getElementById('liveScore');
+  const startScreen = document.getElementById('startScreen');
+  const gameOverScreen = document.getElementById('gameOverScreen');
+  const startHighScoreEl = document.getElementById('startHighScore');
+  const finalScoreEl = document.getElementById('finalScore');
+  const finalHighScoreEl = document.getElementById('finalHighScore');
+  const newHighLabel = document.getElementById('newHighLabel');
+  const startBtn = document.getElementById('startBtn');
+  const restartBtn = document.getElementById('restartBtn');
+  const muteBtn = document.getElementById('muteBtn');
+
+  // ---------- Game State ----------
+  const STATE = { START: 'start', PLAYING: 'playing', GAMEOVER: 'gameover' };
+  let gameState = STATE.START;
+
+  const HIGH_SCORE_KEY = 'flyingGrannyHighScore';
+  let highScore = parseInt(localStorage.getItem(HIGH_SCORE_KEY)) || 0;
+  startHighScoreEl.textContent = highScore;
+
+  let score = 0;
+  let frame = 0;
+
+  const granny = {
+    x: 110,
+    y: H / 2,
+    radius: 22,
+    velocity: 0,
+    gravity: 0.5,
+    flapPower: -8.5,
+    rotation: 0
+  };
+
+  let obstacles = [];
+  let obstacleTimer = 0;
+  let obstacleInterval = 95;
+  let baseSpeed = 3.2;
+  let speed = baseSpeed;
+  const gapSize = 190;
+  const obstacleWidth = 64;
+
+  let particles = [];
+
+  let bgOffset1 = 0;
+  let bgOffset2 = 0;
+
+  const floorHeight = 60;
+
+  // =========================================================
+  // ---------- AUDIO ENGINE (your own mp3 files) -------------
+  // =========================================================
+  const bgMusic = new Audio('song.mp3');
+  bgMusic.loop = true;
+  bgMusic.volume = 0.5;
+
+  const endSound = new Audio('end.mp3');
+  endSound.loop = false;
+  endSound.volume = 0.7;
+
+  let musicMuted = false;
+
+  function startMusic() {
+    bgMusic.currentTime = 0; // always restart from the beginning
+    bgMusic.play().catch(err => {
+      // Autoplay is blocked until a user gesture; startGame() is always
+      // triggered by a click/tap/keypress, so this should succeed.
+      console.warn('Music play blocked:', err);
+    });
+  }
+
+  function stopMusic() {
+    bgMusic.pause();
+    bgMusic.currentTime = 0; // reset so the next start is from 0:00
+  }
+
+  function playEndSound() {
+    endSound.currentTime = 0; // always play from the start
+    endSound.play().catch(err => {
+      console.warn('End sound play blocked:', err);
+    });
+  }
+
+  function stopEndSound() {
+    endSound.pause();
+    endSound.currentTime = 0; // reset so it's ready to play again next time
+  }
+
+  function toggleMute() {
+    musicMuted = !musicMuted;
+    bgMusic.muted = musicMuted;
+    endSound.muted = musicMuted;
+    muteBtn.textContent = musicMuted ? '🔇' : '🔊';
+  }
+
+  muteBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    toggleMute();
+  });
+
+  // ---------- Utility ----------
+  function rand(min, max) { return Math.random() * (max - min) + min; }
+
+  function resetGame() {
+    score = 0;
+    frame = 0;
+    granny.y = H / 2;
+    granny.velocity = 0;
+    granny.rotation = 0;
+    obstacles = [];
+    obstacleTimer = 0;
+    speed = baseSpeed;
+    particles = [];
+    liveScoreEl.textContent = '0';
+  }
+
+  function flap() {
+    if (gameState === STATE.PLAYING) {
+      granny.velocity = granny.flapPower;
+      spawnFlapParticles();
+    }
+  }
+
+  function spawnFlapParticles() {
+    for (let i = 0; i < 6; i++) {
+      particles.push({
+        x: granny.x - 10,
+        y: granny.y + rand(-5, 10),
+        vx: rand(-2.5, -0.5),
+        vy: rand(-1, 1.5),
+        life: 30,
+        maxLife: 30,
+        size: rand(3, 7),
+        color: ['#f4d35e', '#ee964b', '#f95738'][Math.floor(rand(0, 3))]
+      });
+    }
+  }
+
+  function updateParticles() {
+    for (let i = particles.length - 1; i >= 0; i--) {
+      const p = particles[i];
+      p.x += p.vx;
+      p.y += p.vy;
+      p.life--;
+      if (p.life <= 0) particles.splice(i, 1);
+    }
+  }
+
+  function drawParticles() {
+    particles.forEach(p => {
+      ctx.globalAlpha = p.life / p.maxLife;
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+      ctx.fill();
+    });
+    ctx.globalAlpha = 1;
+  }
+
+  // ---------- Obstacles ----------
+  function createObstacle() {
+    const minGapY = 100;
+    const maxGapY = H - floorHeight - 100 - gapSize;
+    const gapY = rand(minGapY, maxGapY);
+    obstacles.push({
+      x: W + obstacleWidth,
+      gapY: gapY,
+      passed: false,
+      colorSeed: Math.floor(rand(0, 3))
+    });
+  }
+
+  function updateObstacles() {
+    obstacleTimer++;
+    if (obstacleTimer >= obstacleInterval) {
+      createObstacle();
+      obstacleTimer = 0;
+    }
+
+    for (let i = obstacles.length - 1; i >= 0; i--) {
+      const o = obstacles[i];
+      o.x -= speed;
+
+      if (!o.passed && o.x + obstacleWidth < granny.x) {
+        o.passed = true;
+        score++;
+        liveScoreEl.textContent = score;
+        speed = baseSpeed + score * 0.06;
+        if (obstacleInterval > 60) {
+          obstacleInterval = Math.max(60, 95 - score * 0.5);
+        }
+      }
+
+      if (o.x + obstacleWidth < -10) {
+        obstacles.splice(i, 1);
+      }
+    }
+  }
+
+  function drawYarnBall(cx, cy, r, baseColor, stripeColor) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fillStyle = baseColor;
+    ctx.fill();
+    ctx.strokeStyle = '#00000022';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    ctx.strokeStyle = stripeColor;
+    ctx.lineWidth = 2.5;
+    for (let i = 0; i < 5; i++) {
+      ctx.beginPath();
+      const angleOffset = i * 0.7;
+      ctx.ellipse(cx, cy, r - 4, r * 0.4, angleOffset, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    ctx.beginPath();
+    ctx.arc(cx - r * 0.35, cy - r * 0.35, r * 0.25, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255,255,255,0.35)';
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function drawObstacles() {
+    const themes = [
+      { base: '#e63946', stripe: '#ffafa3' },
+      { base: '#2a9d8f', stripe: '#a8f0e6' },
+      { base: '#8338ec', stripe: '#d8b4ff' }
+    ];
+
+    obstacles.forEach(o => {
+      const theme = themes[o.colorSeed];
+      const ballR = obstacleWidth / 2;
+      const cx = o.x + ballR;
+
+      let y = o.gapY - ballR;
+      while (y > -ballR) {
+        drawYarnBall(cx, y, ballR, theme.base, theme.stripe);
+        y -= ballR * 1.7;
+      }
+      ctx.fillStyle = '#c9a876';
+      ctx.fillRect(cx - 2, o.gapY - 14, 4, 24);
+
+      const bottomStart = o.gapY + gapSize;
+      let y2 = bottomStart + ballR;
+      const floorY = H - floorHeight;
+      while (y2 - ballR < floorY) {
+        drawYarnBall(cx, y2, ballR, theme.base, theme.stripe);
+        y2 += ballR * 1.7;
+      }
+      ctx.fillStyle = '#c9a876';
+      ctx.fillRect(cx - 2, bottomStart - 10, 4, 24);
+    });
+  }
+
+  // ---------- Collision ----------
+  function checkCollisions() {
+    if (granny.y + granny.radius >= H - floorHeight) {
+      granny.y = H - floorHeight - granny.radius;
+      return true;
+    }
+    if (granny.y - granny.radius <= 0) {
+      granny.y = granny.radius;
+      granny.velocity = 0;
+      return false;
+    }
+
+    for (const o of obstacles) {
+      const left = o.x;
+      const right = o.x + obstacleWidth;
+
+      const withinX = granny.x + granny.radius > left && granny.x - granny.radius < right;
+      if (withinX) {
+        const inGap = granny.y - granny.radius > o.gapY && granny.y + granny.radius < o.gapY + gapSize;
+        if (!inGap) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  // ---------- Drawing ----------
+  function drawBackground() {
+    const grad = ctx.createLinearGradient(0, 0, 0, H);
+    grad.addColorStop(0, '#a7d8f0');
+    grad.addColorStop(1, '#e9f6ff');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, W, H);
+
+    ctx.fillStyle = 'rgba(255, 218, 185, 0.25)';
+    bgOffset1 -= speed * 0.2;
+    if (bgOffset1 <= -60) bgOffset1 = 0;
+    for (let x = bgOffset1; x < W + 60; x += 60) {
+      for (let y = 0; y < H; y += 60) {
+        ctx.beginPath();
+        ctx.moveTo(x + 30, y);
+        ctx.lineTo(x + 60, y + 30);
+        ctx.lineTo(x + 30, y + 60);
+        ctx.lineTo(x, y + 30);
+        ctx.closePath();
+        ctx.fill();
+      }
+    }
+
+    bgOffset2 -= speed * 0.5;
+    if (bgOffset2 <= -200) bgOffset2 = 0;
+    drawCloud(bgOffset2 + 50, 90, 1);
+    drawCloud(bgOffset2 + 280, 160, 0.8);
+    drawCloud(bgOffset2 + 450, 60, 1.1);
+    drawCloud(bgOffset2 - 150, 200, 0.9);
+
+    ctx.fillStyle = '#8d5524';
+    ctx.fillRect(0, H - floorHeight, W, floorHeight);
+    ctx.fillStyle = '#a9714a';
+    ctx.fillRect(0, H - floorHeight, W, 10);
+    ctx.fillStyle = '#7a431b';
+    let floorScroll = (frame * speed) % 40;
+    for (let x = -40; x < W + 40; x += 40) {
+      ctx.fillRect(x - floorScroll, H - floorHeight + 20, 20, 8);
+    }
+  }
+
+  function drawCloud(x, y, scale) {
+    ctx.save();
+    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    ctx.beginPath();
+    ctx.arc(x, y, 20 * scale, 0, Math.PI * 2);
+    ctx.arc(x + 22 * scale, y - 10 * scale, 25 * scale, 0, Math.PI * 2);
+    ctx.arc(x + 46 * scale, y, 20 * scale, 0, Math.PI * 2);
+    ctx.arc(x + 22 * scale, y + 8 * scale, 22 * scale, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function drawGranny() {
+    ctx.save();
+    ctx.translate(granny.x, granny.y);
+
+    granny.rotation = Math.max(-0.5, Math.min(0.9, granny.velocity * 0.06));
+    ctx.rotate(granny.rotation);
+
+    ctx.beginPath();
+    ctx.ellipse(0, 6, 18, 20, 0, 0, Math.PI * 2);
+    ctx.fillStyle = '#9d4edd';
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.arc(0, -14, 14, 0, Math.PI * 2);
+    ctx.fillStyle = '#ffd9b3';
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.arc(0, -24, 8, 0, Math.PI * 2);
+    ctx.fillStyle = '#e0e0e0';
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(0, -14, 15, Math.PI * 0.9, Math.PI * 2.1);
+    ctx.fillStyle = '#e0e0e0';
+    ctx.fill();
+
+    ctx.strokeStyle = '#333';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(-5, -14, 4, 0, Math.PI * 2);
+    ctx.arc(5, -14, 4, 0, Math.PI * 2);
+    ctx.moveTo(-1, -14);
+    ctx.lineTo(1, -14);
+    ctx.stroke();
+
+    ctx.fillStyle = '#333';
+    ctx.beginPath();
+    ctx.arc(-5, -14, 1.3, 0, Math.PI * 2);
+    ctx.arc(5, -14, 1.3, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.arc(0, -9, 4, 0.1 * Math.PI, 0.9 * Math.PI);
+    ctx.stroke();
+
+    ctx.fillStyle = 'rgba(255,150,150,0.5)';
+    ctx.beginPath();
+    ctx.arc(-8, -10, 2.5, 0, Math.PI * 2);
+    ctx.arc(8, -10, 2.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    const wingFlap = Math.sin(frame * 0.3) * 10;
+    ctx.strokeStyle = '#8B4513';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(-14, 4);
+    ctx.lineTo(-26, -2 + wingFlap * 0.3);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(14, 4);
+    ctx.lineTo(26, -2 - wingFlap * 0.3);
+    ctx.stroke();
+
+    ctx.restore();
+  }
+
+  // ---------- Main Loop ----------
+  function update() {
+    frame++;
+
+    if (gameState === STATE.PLAYING) {
+      granny.velocity += granny.gravity;
+      granny.y += granny.velocity;
+
+      updateObstacles();
+      updateParticles();
+
+      if (checkCollisions()) {
+        endGame();
+      }
+    } else {
+      updateParticles();
+    }
+  }
+
+  function render() {
+    drawBackground();
+
+    if (gameState !== STATE.START) {
+      drawObstacles();
+    }
+
+    drawParticles();
+    drawGranny();
+  }
+
+  function loop() {
+    update();
+    render();
+    requestAnimationFrame(loop);
+  }
+
+  // ---------- State Transitions ----------
+  function startGame() {
+    resetGame();
+    gameState = STATE.PLAYING;
+    startScreen.classList.add('hidden');
+    gameOverScreen.classList.add('hidden');
+    liveScoreEl.style.display = 'block';
+
+    // Stop the death sound (in case it's still playing) and
+    // start the background music fresh
+    stopEndSound();
+    startMusic();
+  }
+
+  function endGame() {
+    gameState = STATE.GAMEOVER;
+    liveScoreEl.style.display = 'none';
+
+    // Stop the background music and play the death sound instead
+    stopMusic();
+    playEndSound();
+
+    let isNewHigh = false;
+    if (score > highScore) {
+      highScore = score;
+      localStorage.setItem(HIGH_SCORE_KEY, highScore);
+      isNewHigh = true;
+    }
+
+    finalScoreEl.textContent = score;
+    finalHighScoreEl.textContent = highScore;
+    newHighLabel.style.display = isNewHigh ? 'block' : 'none';
+
+    gameOverScreen.classList.remove('hidden');
+
+    container.style.transform = 'translateX(-8px)';
+    setTimeout(() => { container.style.transform = 'translateX(8px)'; }, 60);
+    setTimeout(() => { container.style.transform = 'translateX(0)'; }, 120);
+  }
+
+  function handleInput(e) {
+    if (e) e.preventDefault();
+    if (gameState === STATE.START) {
+      startGame();
+    } else if (gameState === STATE.PLAYING) {
+      flap();
+    }
+  }
+
+  // ---------- Event Listeners ----------
+  canvas.addEventListener('mousedown', handleInput);
+  canvas.addEventListener('touchstart', handleInput, { passive: false });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.code === 'Space') {
+      handleInput(e);
+    }
+  });
+
+  startBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    startGame();
+  });
+
+  restartBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    startGame();
+  });
+
+  window.addEventListener('keydown', (e) => {
+    if (e.code === 'Space') e.preventDefault();
+  });
+
+  // ---------- Boot ----------
+  loop();
+})();
+</script>
+</body>
+</html>
